@@ -5,7 +5,7 @@ import ImageGalleryItem from '../ImageGalleryItem';
 
 import styles from './ImageGallery.module.css';
 
-function ImageGallery({ dataImages, onOpenModal }) {
+const ImageGallery = ({ dataImages, onOpenModal }) => {
   return (
     <ul className={styles.ImageGallery}>
       {dataImages.map(image => (

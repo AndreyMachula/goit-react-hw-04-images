@@ -4,7 +4,7 @@ import { Grid } from 'react-loader-spinner';
 
 import styles from './Loader.module.css';
 
-function Loader() {
+const Loader = () => {
   return (
     <div className={styles.Loader}>
       <Grid
@@ -15,6 +15,6 @@ function Loader() {
       />
     </div>
   );
-}
+};
 
 export default Loader;
