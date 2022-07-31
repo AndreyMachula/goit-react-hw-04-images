@@ -12,7 +12,7 @@ const Modal = ({ onCloseModal, children }) => {
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    console.log();
+
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onCloseModal]);
 
@@ -27,7 +27,7 @@ const Modal = ({ onCloseModal, children }) => {
       <div className={styles.Modal}>{children}</div>
     </div>
   );
-};
+}
 
 Modal.propTypes = {
   onCloseModal: PropTypes.func.isRequired,

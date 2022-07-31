@@ -1,10 +1,10 @@
-import { Component } from 'react';
+import { useState, useEffect } from 'react';
 
 import { animateScroll as scroll } from 'react-scroll';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
-import PixabayApi from '../api/PixabayApi';
+import API from '../api/PixabayApi';
 import Searchbar from './Searchbar';
 import ImageGallery from './ImageGallery';
 import Loader from './Loader';
@@ -13,141 +13,104 @@ import Button from './Button';
 
 import styles from './App.module.css';
 
-class App extends Component {
-  state = {
-    dataImages: [],
-    searchQuery: '',
-    page: 1,
-    status: 'idle',
-    error: null,
-    showModal: false,
-    largeImageURL: '',
-    tagImageAlt: '',
-    loader: false,
-  };
+const App = () => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [page, setPage] = useState(1);
+  const [dataImages, setDataImages] = useState([]);
+  const [error, setError] = useState(null);
+  const [largeImageURL, setLargeImageURL] = useState('');
+  const [tagImageAlt, setTagImageAlt] = useState('');
+  const [status, setStatus] = useState('idle');
 
-  componentDidUpdate(prevProps, prevState) {
-    const { searchQuery, page } = this.state;
+  useEffect(() => {
+    let controller = new AbortController();
+    let signal = controller.signal;
 
-    if (prevState.searchQuery !== searchQuery) {
-      this.setState({ status: 'pending' });
-
-      PixabayApi(searchQuery, page)
-        .then(response =>
-          this.setState({
-            dataImages: response,
-            page: 1,
-            status: 'resolved',
-          })
-        )
-        .catch(error => this.setState({ error, status: 'rejected' }));
-
-      scroll.scrollToBottom();
+    if (searchQuery === '') {
+      return;
     }
 
-    if (prevState.page !== page && page !== 1) {
-      this.setState({ status: 'pending' });
+    setStatus('pending');
 
-      PixabayApi(searchQuery, page)
-        .then(response =>
-          this.setState(prevState => ({
-            dataImages: [...prevState.dataImages, ...response],
-            status: 'resolved',
-          }))
-        )
-        .catch(error => {
-          this.setState({ error, status: 'rejected' });
-          toast.error(`${searchQuery} no found`);
-        });
+    API(searchQuery, page, { signal })
+      .then(response => {
+        if (searchQuery !== '' && response.length !== 0 && page === 1) {
+          toast.success(`Images ${searchQuery} found`);
+          setDataImages(response);
+          setStatus('resolved');
+        }
+        if (response.length !== 0 && page > 1) {
+          setDataImages(prevDataImages => [...prevDataImages, ...response]);
+          setStatus('resolved');
+          scroll.scrollToBottom(100);
+        }
 
-      scroll.scrollToBottom();
-    }
-  }
+        if (response.length === 0) {
+          toast.error(`Images ${searchQuery} not found`);
+          setStatus('idle');
+        }
+      })
+      .catch(error => {
+        setError(error);
+        setStatus('rejected');
+      });
+    return () => controller.abort();
+  }, [searchQuery, page]);
 
-  handleFormSubmit = searchQuery => {
-    this.setState({ searchQuery });
+  const handleFormSubmit = searchQuery => {
+    setDataImages([]);
+    setSearchQuery(searchQuery);
+    setPage(1);
   };
 
-  handleLoadMore = () => {
-    this.setState(prevState => ({
-      page: prevState.page + 1,
-    }));
-  };
-
-  handleOpenModal = image => {
+  const handleOpenModal = image => {
     const { largeImageURL, tags } = image;
-    this.setState({
-      showModal: true,
-      largeImageURL: largeImageURL,
-      tagImageAlt: tags,
-    });
+
+    setShowModal(true);
+    setLargeImageURL(largeImageURL);
+    setTagImageAlt(tags);
   };
 
-  handleCloseModal = e => {
-    this.setState({
-      showModal: false,
-      largeImageURL: '',
-      tagImageAlt: '',
-    });
+  const handleCloseModal = e => {
+    setShowModal(false);
+    setLargeImageURL('');
+    setTagImageAlt('');
   };
 
-  scrollToBottom = () => {
-    scroll.scrollToBottom();
-  };
+  return (
+    <div className={styles.App}>
+      <Searchbar onFormSubmit={handleFormSubmit} />
 
-  render() {
-    const {
-      dataImages,
-      showModal,
-      largeImageURL,
-      tagImageAlt,
-      status,
-      error,
-      searchQuery,
-    } = this.state;
+      {status === 'idle' && <div>Free images</div>}
 
-    return (
-      <div className={styles.App}>
-        <Searchbar onFormSubmit={this.handleFormSubmit} />
+      {status === 'rejected' && <h1>{error.message}</h1>}
 
-        {status === 'idle' && <div>Free images</div>}
+      {status === 'resolved' && (
+        <>
+          <ImageGallery dataImages={dataImages} onOpenModal={handleOpenModal} />
 
-        {status === 'rejected' && <h1>{error.message}</h1>}
+          {dataImages.length !== 0 && (
+            <Button onLoadMore={() => setPage(prevState => prevState + 1)} />
+          )}
+        </>
+      )}
 
-        {status === 'resolved' && (
-          <>
-            <ImageGallery
-              dataImages={dataImages}
-              onOpenModal={this.handleOpenModal}
-            />
+      {status === 'pending' && (
+        <>
+          <ImageGallery dataImages={dataImages} onOpenModal={handleOpenModal} />{' '}
+          <Loader />
+        </>
+      )}
 
-            {dataImages.length === 0 && <div>{searchQuery} no found</div>}
-
-            {dataImages.length >= 11 && (
-              <Button onLoadMore={this.handleLoadMore} />
-            )}
-          </>
-        )}
-
-        {status === 'pending' && (
-          <>
-            <ImageGallery
-              dataImages={dataImages}
-              onOpenModal={this.handleOpenModal}
-            />
-            {this.state.loader && <Loader />}
-          </>
-        )}
-
-        {showModal && (
-          <Modal onCloseModal={this.handleCloseModal}>
-            <img src={largeImageURL} alt={tagImageAlt} />
-          </Modal>
-        )}
-        <ToastContainer autoClose={3000} />
-      </div>
-    );
-  }
+      {showModal && (
+        <Modal onCloseModal={handleCloseModal}>
+          <img src={largeImageURL} alt={tagImageAlt} />
+        </Modal>
+      )}
+      <ToastContainer autoClose={3000} />
+    </div>
+  );
 }
 
 export default App;
